@@ -54,6 +54,7 @@ const io = new Server(server, {
     origin: [
       process.env.FRONTEND_URL || "https://project1-three-dun.vercel.app/",
       "https://project1-three-dun.vercel.app/",
+      "http://localhost:3000",
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   },
@@ -75,6 +76,7 @@ app.use(
     origin: [
       process.env.FRONTEND_URL || "https://project1-three-dun.vercel.app/",
       "https://project1-three-dun.vercel.app/",
+      "http://localhost:3000",
     ],
     credentials: true,
   })
