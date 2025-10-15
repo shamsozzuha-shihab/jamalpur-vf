@@ -52,12 +52,7 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: [
-      process.env.FRONTEND_URL || "https://project1-three-dun.vercel.app/",
-      "https://project1-three-dun.vercel.app/",
-      "http://localhost:3000",
-      "https://project1-wr4s.onrender.com",
-    ],
+    origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   },
 });
@@ -73,17 +68,7 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Middleware
 app.use(compression({ level: 6, threshold: 1024 }));
-app.use(
-  cors({
-    origin: [
-      process.env.FRONTEND_URL || "https://project1-three-dun.vercel.app/",
-      "https://project1-three-dun.vercel.app/",
-      "http://localhost:3000",
-      "https://project1-wr4s.onrender.com",
-    ],
-    credentials: true,
-  })
-);
+app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
