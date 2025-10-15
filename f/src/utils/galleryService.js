@@ -2,7 +2,7 @@
 class GalleryService {
   constructor() {
     this.apiBaseUrl =
-      process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+      process.env.REACT_APP_API_URL || "https://project1-wr4s.onrender.com/api";
   }
 
   // Get gallery images from API

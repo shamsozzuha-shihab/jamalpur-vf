@@ -1,4 +1,5 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+const API_BASE_URL =
+  process.env.REACT_APP_API_URL || "https://project1-wr4s.onrender.com/api";
 
 class ApiService {
   constructor() {
@@ -22,8 +23,8 @@ class ApiService {
 
   // Request deduplication to prevent multiple identical requests
   async makeRequest(url, options = {}) {
-    const requestKey = `${options.method || 'GET'}:${url}`;
-    
+    const requestKey = `${options.method || "GET"}:${url}`;
+
     // If request is already pending, return the same promise
     if (this.pendingRequests.has(requestKey)) {
       return this.pendingRequests.get(requestKey);
@@ -41,10 +42,10 @@ class ApiService {
   }
 
   async _makeActualRequest(url, options = {}) {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     const config = {
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
         ...options.headers,
       },
@@ -52,10 +53,12 @@ class ApiService {
     };
 
     const response = await fetch(`${this.baseURL}${url}`, config);
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      throw new Error(
+        errorData.message || `HTTP error! status: ${response.status}`
+      );
     }
 
     return response.json();
@@ -64,7 +67,7 @@ class ApiService {
   setCachedData(key, data) {
     this.cache.set(key, {
       data,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
@@ -78,17 +81,17 @@ class ApiService {
 
   // Helper method to get headers with auth token
   getHeaders() {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     return {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` })
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
     };
   }
 
   // Helper method to handle API responses with better error handling
   async handleResponse(response) {
     if (!response.ok) {
-      let errorMessage = 'Something went wrong';
+      let errorMessage = "Something went wrong";
       try {
         const error = await response.json();
         errorMessage = error.message || errorMessage;
@@ -120,61 +123,67 @@ class ApiService {
   // Auth API calls
   async register(userData) {
     const response = await fetch(`${this.baseURL}/auth/register`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
-      body: JSON.stringify(userData)
+      body: JSON.stringify(userData),
     });
     return this.handleResponse(response);
   }
 
   async login(credentials) {
     const response = await fetch(`${this.baseURL}/auth/login`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
-      body: JSON.stringify(credentials)
+      body: JSON.stringify(credentials),
     });
     return this.handleResponse(response);
   }
 
   async getProfile() {
     const response = await fetch(`${this.baseURL}/auth/profile`, {
-      method: 'GET',
-      headers: this.getHeaders()
+      method: "GET",
+      headers: this.getHeaders(),
     });
     return this.handleResponse(response);
   }
 
   async forgotPassword(email) {
     const response = await fetch(`${this.baseURL}/auth/forgot-password`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
-      body: JSON.stringify({ email })
+      body: JSON.stringify({ email }),
     });
     return this.handleResponse(response);
   }
 
   async verifyResetToken(token) {
-    const response = await fetch(`${this.baseURL}/auth/verify-reset-token/${token}`, {
-      method: 'GET',
-      headers: this.getHeaders()
-    });
+    const response = await fetch(
+      `${this.baseURL}/auth/verify-reset-token/${token}`,
+      {
+        method: "GET",
+        headers: this.getHeaders(),
+      }
+    );
     return this.handleResponse(response);
   }
 
   async resetPassword(token, newPassword) {
-    const response = await fetch(`${this.baseURL}/auth/reset-password/${token}`, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify({ newPassword })
-    });
+    const response = await fetch(
+      `${this.baseURL}/auth/reset-password/${token}`,
+      {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: JSON.stringify({ newPassword }),
+      }
+    );
     return this.handleResponse(response);
   }
 
   async changePassword(currentPassword, newPassword) {
     const response = await fetch(`${this.baseURL}/auth/change-password`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
-      body: JSON.stringify({ currentPassword, newPassword })
+      body: JSON.stringify({ currentPassword, newPassword }),
     });
     return this.handleResponse(response);
   }
@@ -182,34 +191,34 @@ class ApiService {
   // Admin management API calls
   async getAdmins() {
     const response = await fetch(`${this.baseURL}/admin/users`, {
-      method: 'GET',
-      headers: this.getHeaders()
+      method: "GET",
+      headers: this.getHeaders(),
     });
     return this.handleResponse(response);
   }
 
   async createAdmin(adminData) {
     const response = await fetch(`${this.baseURL}/admin/users`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
-      body: JSON.stringify(adminData)
+      body: JSON.stringify(adminData),
     });
     return this.handleResponse(response);
   }
 
   async deleteAdmin(adminId) {
     const response = await fetch(`${this.baseURL}/admin/users/${adminId}`, {
-      method: 'DELETE',
-      headers: this.getHeaders()
+      method: "DELETE",
+      headers: this.getHeaders(),
     });
     return this.handleResponse(response);
   }
 
   async updateProfile(profileData) {
     const response = await fetch(`${this.baseURL}/admin/profile`, {
-      method: 'PUT',
+      method: "PUT",
       headers: this.getHeaders(),
-      body: JSON.stringify(profileData)
+      body: JSON.stringify(profileData),
     });
     return this.handleResponse(response);
   }
@@ -217,45 +226,45 @@ class ApiService {
   // Form API calls
   async submitForm(formData) {
     const response = await fetch(`${this.baseURL}/forms/submit`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
-      body: JSON.stringify(formData)
+      body: JSON.stringify(formData),
     });
     return this.handleResponse(response);
   }
 
   async submitFormWithFile(formData) {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     const headers = {
-      ...(token && { Authorization: `Bearer ${token}` })
+      ...(token && { Authorization: `Bearer ${token}` }),
     };
 
     const response = await fetch(`${this.baseURL}/forms/submit-with-file`, {
-      method: 'POST',
+      method: "POST",
       headers,
-      body: formData
+      body: formData,
     });
     return this.handleResponse(response);
   }
 
   async getFormSubmissions() {
     const response = await fetch(`${this.baseURL}/forms/submissions`, {
-      method: 'GET',
-      headers: this.getHeaders()
+      method: "GET",
+      headers: this.getHeaders(),
     });
     return this.handleResponse(response);
   }
 
   // Notice API calls with caching
   async getNotices() {
-    const cacheKey = 'notices';
+    const cacheKey = "notices";
     const cached = this.getCachedData(cacheKey);
     if (cached) return cached;
 
     return this.deduplicatedRequest(cacheKey, async () => {
       const response = await fetch(`${this.baseURL}/notices`, {
-        method: 'GET',
-        headers: this.getHeaders()
+        method: "GET",
+        headers: this.getHeaders(),
       });
       const data = await this.handleResponse(response);
       this.setCachedData(cacheKey, data);
@@ -265,49 +274,49 @@ class ApiService {
 
   async createNotice(noticeData) {
     const response = await fetch(`${this.baseURL}/notices`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
-      body: JSON.stringify(noticeData)
+      body: JSON.stringify(noticeData),
     });
     const result = await this.handleResponse(response);
     // Clear cache after creating
-    this.clearCache('notices');
+    this.clearCache("notices");
     return result;
   }
 
   async updateNotice(id, noticeData) {
     const response = await fetch(`${this.baseURL}/notices/${id}`, {
-      method: 'PUT',
+      method: "PUT",
       headers: this.getHeaders(),
-      body: JSON.stringify(noticeData)
+      body: JSON.stringify(noticeData),
     });
     const result = await this.handleResponse(response);
     // Clear cache after updating
-    this.clearCache('notices');
+    this.clearCache("notices");
     return result;
   }
 
   async deleteNotice(id) {
     const response = await fetch(`${this.baseURL}/notices/${id}`, {
-      method: 'DELETE',
-      headers: this.getHeaders()
+      method: "DELETE",
+      headers: this.getHeaders(),
     });
     const result = await this.handleResponse(response);
     // Clear cache after deleting
-    this.clearCache('notices');
+    this.clearCache("notices");
     return result;
   }
 
   // News API calls with caching
   async getNews() {
-    const cacheKey = 'news';
+    const cacheKey = "news";
     const cached = this.getCachedData(cacheKey);
     if (cached) return cached;
 
     return this.deduplicatedRequest(cacheKey, async () => {
       const response = await fetch(`${this.baseURL}/news`, {
-        method: 'GET',
-        headers: this.getHeaders()
+        method: "GET",
+        headers: this.getHeaders(),
       });
       const data = await this.handleResponse(response);
       this.setCachedData(cacheKey, data);
@@ -317,65 +326,65 @@ class ApiService {
 
   async getNewsAdmin() {
     const response = await fetch(`${this.baseURL}/news/admin`, {
-      method: 'GET',
-      headers: this.getHeaders()
+      method: "GET",
+      headers: this.getHeaders(),
     });
     return this.handleResponse(response);
   }
 
   async createNews(newsData) {
-    console.log('🌐 API: Creating news with data:', newsData);
-    console.log('🌐 API: URL:', `${this.baseURL}/news`);
-    console.log('🌐 API: Headers:', this.getHeaders());
-    
+    console.log("🌐 API: Creating news with data:", newsData);
+    console.log("🌐 API: URL:", `${this.baseURL}/news`);
+    console.log("🌐 API: Headers:", this.getHeaders());
+
     const response = await fetch(`${this.baseURL}/news`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
-      body: JSON.stringify(newsData)
+      body: JSON.stringify(newsData),
     });
-    
-    console.log('🌐 API: Response status:', response.status);
-    console.log('🌐 API: Response ok:', response.ok);
-    
+
+    console.log("🌐 API: Response status:", response.status);
+    console.log("🌐 API: Response ok:", response.ok);
+
     const result = await this.handleResponse(response);
-    console.log('🌐 API: Response result:', result);
-    
+    console.log("🌐 API: Response result:", result);
+
     // Clear cache after creating
-    this.clearCache('news');
-    this.clearCache('newsAdmin');
+    this.clearCache("news");
+    this.clearCache("newsAdmin");
     return result;
   }
 
   async updateNews(id, newsData) {
     const response = await fetch(`${this.baseURL}/news/${id}`, {
-      method: 'PUT',
+      method: "PUT",
       headers: this.getHeaders(),
-      body: JSON.stringify(newsData)
+      body: JSON.stringify(newsData),
     });
     const result = await this.handleResponse(response);
     // Clear cache after updating
-    this.clearCache('news');
-    this.clearCache('newsAdmin');
+    this.clearCache("news");
+    this.clearCache("newsAdmin");
     return result;
   }
 
   async deleteNews(id) {
     const response = await fetch(`${this.baseURL}/news/${id}`, {
-      method: 'DELETE',
-      headers: this.getHeaders()
+      method: "DELETE",
+      headers: this.getHeaders(),
     });
     const result = await this.handleResponse(response);
     // Clear cache after deleting
-    this.clearCache('news');
-    this.clearCache('newsAdmin');
+    this.clearCache("news");
+    this.clearCache("newsAdmin");
     return result;
   }
 
   // Health check
   async healthCheck() {
     const response = await fetch(`${this.baseURL}/health`, {
-      method: 'GET',
-      headers: this.getHeaders()
+      method: "GET",
+      headers: this.getHeaders(),
     });
     return this.handleResponse(response);
   }
