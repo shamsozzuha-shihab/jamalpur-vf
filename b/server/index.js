@@ -47,6 +47,7 @@ const cloudinary = require("./config/cloudinary");
 // Import keepalive service
 const keepAliveService = require("./keepalive");
 
+//https://project1-three-dun.vercel.app
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
@@ -55,6 +56,7 @@ const io = new Server(server, {
       process.env.FRONTEND_URL || "https://project1-three-dun.vercel.app/",
       "https://project1-three-dun.vercel.app/",
       "http://localhost:3000",
+      "https://project1-wr4s.onrender.com",
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   },
@@ -77,6 +79,7 @@ app.use(
       process.env.FRONTEND_URL || "https://project1-three-dun.vercel.app/",
       "https://project1-three-dun.vercel.app/",
       "http://localhost:3000",
+      "https://project1-wr4s.onrender.com",
     ],
     credentials: true,
   })
