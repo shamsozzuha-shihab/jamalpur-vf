@@ -52,11 +52,9 @@ const server = createServer(app);
 const io = new Server(server, {
   cors: {
     origin: [
-      process.env.FRONTEND_URL || "http://localhost:3000",
-      "https://thejamalpurchamberofcommerce.com",
-      "https://jamalpurfinal-git-main-shihabs-projects-d3738d3b.vercel.app",
+      process.env.FRONTEND_URL || "https://project1-three-dun.vercel.app/",
     ],
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   },
 });
 const PORT = process.env.PORT || 5000;
