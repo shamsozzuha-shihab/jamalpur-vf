@@ -72,9 +72,7 @@ app.use(compression({ level: 6, threshold: 1024 }));
 app.use(
   cors({
     origin: [
-      process.env.FRONTEND_URL || "http://localhost:3000",
-      "https://thejamalpurchamberofcommerce.com",
-      "https://jamalpurfinal-git-main-shihabs-projects-d3738d3b.vercel.app",
+      process.env.FRONTEND_URL || "https://project1-three-dun.vercel.app/",
     ],
     credentials: true,
   })
@@ -422,7 +420,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
 
     // Create reset URL
     const resetUrl = `${
-      process.env.CLIENT_URL || "http://localhost:3000"
+      process.env.CLIENT_URL || "https://project1-three-dun.vercel.app/"
     }/reset-password/${resetToken}`;
 
     // Create email template with reset link
