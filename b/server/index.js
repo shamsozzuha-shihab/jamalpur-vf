@@ -53,6 +53,7 @@ const io = new Server(server, {
   cors: {
     origin: [
       process.env.FRONTEND_URL || "https://project1-three-dun.vercel.app/",
+      "https://project1-three-dun.vercel.app/",
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   },
@@ -73,6 +74,7 @@ app.use(
   cors({
     origin: [
       process.env.FRONTEND_URL || "https://project1-three-dun.vercel.app/",
+      "https://project1-three-dun.vercel.app/",
     ],
     credentials: true,
   })
