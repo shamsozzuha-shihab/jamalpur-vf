@@ -3,9 +3,12 @@
 
 class PDFHandler {
   /**
-   * Download PDF file from server or data URL
-   * @param {Object} pdfFile - PDF file object with filename or data
-   * @param {string} pdfFile.filename - Server filename
+   * Download PDF file from server, Cloudinary, or data URL
+   * @param {Object} pdfFile - PDF file object with filename, url, or data
+   * @param {string} pdfFile.filename - Server filename (legacy)
+   * @param {string} pdfFile.fileId - Server file ID (legacy)
+   * @param {string} pdfFile.url - Cloudinary URL (new format)
+   * @param {string} pdfFile.publicId - Cloudinary public ID (new format)
    * @param {string} pdfFile.originalName - Original filename
    * @param {string} pdfFile.data - Base64 data URL (fallback)
    * @param {string} pdfFile.name - Fallback name
@@ -19,15 +22,22 @@ class PDFHandler {
     console.log("📄 pdfHandler.download: Attempting to download PDF:", {
       hasFilename: !!pdfFile.filename,
       hasFileId: !!pdfFile.fileId,
+      hasUrl: !!pdfFile.url,
+      hasPublicId: !!pdfFile.publicId,
       hasData: !!pdfFile.data,
       filename: pdfFile.filename,
       originalName: pdfFile.originalName,
+      url: pdfFile.url,
       size: pdfFile.size,
     });
 
     try {
-      if (pdfFile.filename || pdfFile.fileId) {
-        // API format - download from server
+      if (pdfFile.url) {
+        // Cloudinary format - download from URL
+        console.log("✅ Using Cloudinary URL download method");
+        return await this._downloadFromUrl(pdfFile);
+      } else if (pdfFile.filename || pdfFile.fileId) {
+        // Legacy API format - download from server
         console.log("✅ Using server download method");
         return await this._downloadFromServer(pdfFile);
       } else if (pdfFile.data) {
@@ -36,7 +46,7 @@ class PDFHandler {
         return this._downloadFromDataURL(pdfFile);
       } else {
         console.error(
-          "❌ Invalid PDF file format - missing filename, fileId, and data:",
+          "❌ Invalid PDF file format - missing url, filename, fileId, and data:",
           pdfFile
         );
         return false;
@@ -60,17 +70,24 @@ class PDFHandler {
     console.log("👁️ pdfHandler.view: Attempting to view PDF:", {
       hasFilename: !!pdfFile.filename,
       hasFileId: !!pdfFile.fileId,
+      hasUrl: !!pdfFile.url,
       hasData: !!pdfFile.data,
       filename: pdfFile.filename,
       originalName: pdfFile.originalName,
+      url: pdfFile.url,
     });
 
     try {
-      if (pdfFile.filename || pdfFile.fileId) {
-        // API format - open from server
+      if (pdfFile.url) {
+        // Cloudinary format - open from URL
+        console.log("✅ Opening Cloudinary PDF URL:", pdfFile.url);
+        window.open(pdfFile.url, "_blank");
+        return true;
+      } else if (pdfFile.filename || pdfFile.fileId) {
+        // Legacy API format - open from server
         const pdfUrl = `${
           process.env.REACT_APP_API_URL ||
-          "https://project1-wr4s.onrender.com/api"
+          "https://jamalpur-chamber-backend-b61d.onrender.com/api"
         }/files/${pdfFile.filename || pdfFile.fileId}`;
         console.log("✅ Opening PDF URL:", pdfUrl);
         window.open(pdfUrl, "_blank");
@@ -82,7 +99,7 @@ class PDFHandler {
         return true;
       } else {
         console.error(
-          "❌ Invalid PDF file format - missing filename, fileId, and data:",
+          "❌ Invalid PDF file format - missing url, filename, fileId, and data:",
           pdfFile
         );
         return false;
@@ -106,12 +123,17 @@ class PDFHandler {
     try {
       let pdfUrl;
 
-      if (pdfFile.filename || pdfFile.fileId) {
+      if (pdfFile.url) {
+        // Cloudinary format - use direct URL
+        pdfUrl = pdfFile.url;
+      } else if (pdfFile.filename || pdfFile.fileId) {
+        // Legacy API format - construct server URL
         pdfUrl = `${
           process.env.REACT_APP_API_URL ||
-          "https://project1-wr4s.onrender.com/api"
+          "https://jamalpur-chamber-backend-b61d.onrender.com/api"
         }/files/${pdfFile.filename || pdfFile.fileId}`;
       } else if (pdfFile.data) {
+        // localStorage format - use data URL
         pdfUrl = pdfFile.data;
       } else {
         console.error("Invalid PDF file format:", pdfFile);
@@ -152,10 +174,38 @@ class PDFHandler {
    */
   isValid(pdfFile) {
     if (!pdfFile) return false;
-    return !!(pdfFile.filename || pdfFile.fileId || pdfFile.data);
+    return !!(pdfFile.url || pdfFile.filename || pdfFile.fileId || pdfFile.data);
   }
 
   // Private methods
+
+  /**
+   * Download PDF from Cloudinary URL
+   * @private
+   */
+  async _downloadFromUrl(pdfFile) {
+    const filename = this.getFilename(pdfFile);
+    
+    try {
+      // Try fetch method first (more reliable for large files)
+      const response = await fetch(pdfFile.url);
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        this._downloadBlob(blob, filename);
+        return true;
+      } else {
+        // Fallback to direct link method
+        this._downloadDirect(pdfFile.url, filename);
+        return true;
+      }
+    } catch (error) {
+      console.error("Fetch download failed, using direct method:", error);
+      // Fallback to direct link method
+      this._downloadDirect(pdfFile.url, filename);
+      return true;
+    }
+  }
 
   /**
    * Download PDF from server
@@ -163,7 +213,7 @@ class PDFHandler {
    */
   async _downloadFromServer(pdfFile) {
     const pdfUrl = `${
-      process.env.REACT_APP_API_URL || "https://project1-wr4s.onrender.com/api"
+      process.env.REACT_APP_API_URL || "https://jamalpur-chamber-backend-b61d.onrender.com/api"
     }/files/${pdfFile.filename || pdfFile.fileId}`;
     const filename = this.getFilename(pdfFile);
 
