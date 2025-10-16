@@ -1,3 +1,6 @@
+// Load environment variables FIRST
+require('dotenv').config();
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -12,9 +15,6 @@ const routes = require('./routes');
 
 // Import middleware
 const { errorHandler } = require('./middleware/errorHandler');
-
-// Load environment variables
-require('dotenv').config();
 
 // Validate required environment variables
 const requiredEnvVars = [
