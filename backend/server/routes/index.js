@@ -7,6 +7,7 @@ const noticeRoutes = require('./noticeRoutes');
 const formRoutes = require('./formRoutes');
 const userRoutes = require('./userRoutes');
 const galleryRoutes = require('./galleryRoutes');
+const newsRoutes = require('./newsRoutes');
 
 // API version prefix
 const API_VERSION = '/api';
@@ -17,6 +18,7 @@ router.use(`${API_VERSION}/notices`, noticeRoutes);
 router.use(`${API_VERSION}/forms`, formRoutes);
 router.use(`${API_VERSION}/admin/users`, userRoutes);
 router.use(`${API_VERSION}/gallery`, galleryRoutes);
+router.use(`${API_VERSION}/news`, newsRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {
@@ -39,7 +41,8 @@ router.get('/api', (req, res) => {
       notices: '/api/notices',
       forms: '/api/forms',
       users: '/api/admin/users',
-      gallery: '/api/gallery'
+      gallery: '/api/gallery',
+      news: '/api/news'
     },
     documentation: 'https://github.com/shamsozzuha-shihab/jamapur_backend_2'
   });
