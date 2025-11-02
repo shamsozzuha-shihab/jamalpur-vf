@@ -140,7 +140,17 @@ class EmailService {
 
   // Send password reset email
   async sendPasswordResetEmail(email, resetToken) {
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
+    // Ensure we always have a valid frontend URL
+    let frontendUrl = process.env.FRONTEND_URL && process.env.FRONTEND_URL !== 'undefined' 
+      ? process.env.FRONTEND_URL 
+      : 'http://localhost:3000';
+    
+    // Remove trailing slash if present to avoid double slashes
+    frontendUrl = frontendUrl.replace(/\/$/, '');
+    
+    const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+    console.log('📧 EmailService - Reset URL:', resetUrl);
+    console.log('📧 EmailService - FRONTEND_URL env:', process.env.FRONTEND_URL);
     const subject = "Password Reset - Jamalpur Chamber of Commerce";
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
