@@ -502,17 +502,10 @@ app.post("/api/auth/forgot-password", async (req, res) => {
     user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
     await user.save();
 
-    // Create reset URL - ensure we always have a valid URL
-    let frontendUrl = process.env.FRONTEND_URL && process.env.FRONTEND_URL !== 'undefined'
-      ? process.env.FRONTEND_URL
-      : "http://localhost:3000";
-    
-    // Remove trailing slash if present
-    frontendUrl = frontendUrl.replace(/\/$/, '');
-    
-    const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
-    console.log('📧 Generated reset URL:', resetUrl);
-    console.log('📧 FRONTEND_URL from env:', process.env.FRONTEND_URL);
+    // Create reset URL
+    const resetUrl = `${
+      process.env.FRONTEND_URL || "http://localhost:3000"
+    }/reset-password/${resetToken}`;
 
     // Create email template with reset link
     const emailHtml = `
@@ -596,10 +589,8 @@ app.get("/api/auth/verify-reset-token/:token", async (req, res) => {
       return res.status(400).json({ message: "Reset token is required" });
     }
 
-    console.log('🔍 Verifying token:', token.substring(0, 20) + '...');
     const crypto = require("crypto");
     const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-    console.log('🔍 Hashed token:', hashedToken.substring(0, 20) + '...');
 
     const user = await User.findOne({
       resetPasswordToken: hashedToken,
@@ -607,20 +598,11 @@ app.get("/api/auth/verify-reset-token/:token", async (req, res) => {
     });
 
     if (!user) {
-      console.log('❌ Token not found or expired');
-      // Check if token exists but expired
-      const expiredUser = await User.findOne({
-        resetPasswordToken: hashedToken,
-      });
-      if (expiredUser) {
-        console.log('⏰ Token exists but expired. Expiry:', new Date(expiredUser.resetPasswordExpires));
-      }
       return res
         .status(400)
         .json({ message: "Invalid or expired reset token" });
     }
 
-    console.log('✅ Token is valid for user:', user.email);
     res.json({
       message: "Reset token is valid",
       success: true,
@@ -638,8 +620,6 @@ app.post("/api/auth/reset-password/:token", async (req, res) => {
     const { token } = req.params;
     const { newPassword } = req.body;
 
-    console.log('🔑 Reset password attempt - Token:', token ? token.substring(0, 20) + '...' : 'missing');
-
     if (!token || !newPassword) {
       return res
         .status(400)
@@ -654,7 +634,6 @@ app.post("/api/auth/reset-password/:token", async (req, res) => {
 
     const crypto = require("crypto");
     const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-    console.log('🔑 Hashed token:', hashedToken.substring(0, 20) + '...');
 
     const user = await User.findOne({
       resetPasswordToken: hashedToken,
@@ -662,19 +641,11 @@ app.post("/api/auth/reset-password/:token", async (req, res) => {
     });
 
     if (!user) {
-      console.log('❌ Reset password: Token not found or expired');
-      // Check if expired
-      const expiredUser = await User.findOne({ resetPasswordToken: hashedToken });
-      if (expiredUser) {
-        console.log('⏰ Token expired at:', new Date(expiredUser.resetPasswordExpires));
-      }
       return res.status(400).json({
         message:
           "Invalid or expired reset token. Please request a new password reset.",
       });
     }
-
-    console.log('✅ Password reset authorized for:', user.email);
 
     // Update password and clear reset token
     user.password = await bcrypt.hash(newPassword, 10);
