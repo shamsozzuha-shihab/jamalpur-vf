@@ -47,6 +47,10 @@ const cloudinary = require("./config/cloudinary");
 // Import keepalive service
 const keepAliveService = require("./keepalive");
 
+// Import monitoring services
+const databaseMonitor = require("./middleware/databaseMonitor");
+const cloudinaryMonitor = require("./middleware/cloudinaryMonitor");
+
 //https://project1-three-dun.vercel.app
 const app = express();
 const server = createServer(app);
@@ -278,14 +282,6 @@ const requireAdmin = (req, res, next) => {
 
 // API Routes
 
-app.get("/api/health", (req, res) => {
-  res.json({
-    message: "THE JAMALPUR CHAMBER OF COMMERCE AND INDUSTRY API is running!",
-    status: "OK",
-    timestamp: new Date().toISOString(),
-  });
-});
-
 // Test endpoint for frontend-backend connection
 app.get("/api/test", (req, res) => {
   res.json({
@@ -324,6 +320,77 @@ app.get(
     }
   }
 );
+
+// Comprehensive system health check
+app.get("/api/health/detailed", authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const healthCheck = {
+      timestamp: new Date().toISOString(),
+      server: {
+        status: 'healthy',
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        nodeVersion: process.version
+      },
+      database: databaseMonitor.getStatus(),
+      cloudinary: cloudinaryMonitor.getStatus(),
+      environment: {
+        nodeEnv: process.env.NODE_ENV,
+        port: process.env.PORT,
+        hasMongoUri: !!process.env.MONGODB_URI,
+        hasCloudinaryConfig: !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
+      }
+    };
+
+    // Test database operations
+    const dbTest = await databaseMonitor.testDatabaseOperations();
+    healthCheck.database.testResults = dbTest;
+
+    // Test Cloudinary operations
+    const cloudinaryTest = await cloudinaryMonitor.testCloudinaryOperations();
+    healthCheck.cloudinary.testResults = cloudinaryTest;
+
+    // Overall health status
+    const isHealthy = healthCheck.database.connectionStatus === 'connected' && 
+                     healthCheck.cloudinary.connectionStatus === 'connected' &&
+                     dbTest.success && cloudinaryTest.success;
+
+    res.status(isHealthy ? 200 : 503).json({
+      ...healthCheck,
+      overallStatus: isHealthy ? 'healthy' : 'unhealthy'
+    });
+
+  } catch (error) {
+    console.error('❌ Health check failed:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Health check failed',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Quick health check (no authentication required)
+app.get("/api/health", async (req, res) => {
+  try {
+    const isHealthy = databaseMonitor.connectionStatus === 'connected' && 
+                     cloudinaryMonitor.connectionStatus === 'connected';
+
+    res.status(isHealthy ? 200 : 503).json({
+      status: isHealthy ? 'healthy' : 'unhealthy',
+      timestamp: new Date().toISOString(),
+      database: databaseMonitor.connectionStatus,
+      cloudinary: cloudinaryMonitor.connectionStatus
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Health check failed',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
 app.post("/api/auth/register", async (req, res) => {
   try {
@@ -437,7 +504,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
 
     // Create reset URL
     const resetUrl = `${
-      process.env.CLIENT_URL || "https://project1-three-dun.vercel.app/"
+      process.env.FRONTEND_URL || "http://localhost:3000"
     }/reset-password/${resetToken}`;
 
     // Create email template with reset link
@@ -758,6 +825,49 @@ app.get(
     } catch (error) {
       console.error("Get submissions error:", error);
       res.status(500).json({ message: "Server error fetching submissions" });
+    }
+  }
+);
+
+// Delete form submission (Admin only)
+app.delete(
+  "/api/forms/submissions/:id",
+  authenticateToken,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const submission = await FormSubmission.findById(id);
+
+      if (!submission) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Form submission not found' 
+        });
+      }
+
+      // Delete PDF from Cloudinary if exists
+      if (submission.pdfFile && submission.pdfFile.publicId) {
+        try {
+          await deleteFromCloudinary(submission.pdfFile.publicId);
+        } catch (cloudinaryError) {
+          console.error('Cloudinary deletion error:', cloudinaryError);
+          // Continue with database deletion even if Cloudinary fails
+        }
+      }
+
+      await FormSubmission.findByIdAndDelete(id);
+
+      res.json({
+        success: true,
+        message: 'Form submission deleted successfully'
+      });
+    } catch (error) {
+      console.error('Delete submission error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Server error while deleting submission' 
+      });
     }
   }
 );
@@ -1809,6 +1919,10 @@ server.listen(PORT, async () => {
 
   // Initialize default admin after server starts
   await initializeDefaultAdmin();
+
+  // Start monitoring services
+  databaseMonitor.startMonitoring();
+  cloudinaryMonitor.startMonitoring();
 
   // Start keepalive service to prevent Render from sleeping
   keepAliveService.start();

@@ -36,7 +36,7 @@ class KeepAliveService {
 
     // Make a simple request to keep the service awake
     const options = {
-      hostname: "jamalpur-chamber-backend.onrender.com",
+      hostname: "jamalpur-chamber-backend-b61d.onrender.com",
       port: 443,
       path: "/health",
       method: "GET",

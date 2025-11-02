@@ -140,7 +140,7 @@ class EmailService {
 
   // Send password reset email
   async sendPasswordResetEmail(email, resetToken) {
-    const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
     const subject = "Password Reset - Jamalpur Chamber of Commerce";
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

@@ -2,10 +2,10 @@
   "name": "jamalpur-chamber-backend",
   "version": "1.0.0",
   "description": "Jamalpur Chamber of Commerce & Industry - Backend API",
-  "main": "server/server.js",
+  "main": "server/index.js",
   "scripts": {
-    "start": "node server/server.js",
-    "dev": "nodemon server/server.js",
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -28,7 +28,7 @@
   "bugs": {
     "url": "https://github.com/shamsozzuha-shihab/jamapur_backend_2/issues"
   },
-  "homepage": "https://jamalpur-chamber-backend.onrender.com",
+  "homepage": "https://jamalpur-chamber-backend-b61d.onrender.com",
   "engines": {
     "node": ">=16.0.0",
     "npm": ">=8.0.0"
