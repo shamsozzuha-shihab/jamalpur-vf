@@ -546,11 +546,6 @@ app.post("/api/auth/forgot-password", async (req, res) => {
             </p>
           </div>
           
-          <p style="color: #64748b; font-size: 14px; margin: 20px 0 0 0;">
-            If the button doesn't work, copy and paste this link into your browser:<br>
-            <a href="${resetUrl}" style="color: #667eea; word-break: break-all;">${resetUrl}</a>
-          </p>
-          
           <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
           
           <p style="color: #64748b; font-size: 14px; margin: 0;">
@@ -765,7 +760,13 @@ app.post(
       // Add PDF file information if uploaded to Cloudinary
       if (req.file) {
         try {
-          const cloudinaryResult = await uploadToCloudinary(req.file.path);
+          // CRITICAL: PDFs must use resource_type: "raw" to preserve as PDF
+          const isPdf = req.file.mimetype === 'application/pdf';
+          const uploadOptions = isPdf 
+            ? { resource_type: 'raw', folder: 'jamalpur-chamber/pdf' }
+            : {};
+          
+          const cloudinaryResult = await uploadToCloudinary(req.file.path, uploadOptions);
           submissionData.pdfFile = {
             publicId: cloudinaryResult.public_id,
             originalName: req.file.originalname,
@@ -849,7 +850,7 @@ app.delete(
       // Delete PDF from Cloudinary if exists
       if (submission.pdfFile && submission.pdfFile.publicId) {
         try {
-          await deleteFromCloudinary(submission.pdfFile.publicId);
+          await deleteFromCloudinary(submission.pdfFile.publicId, 'raw');
         } catch (cloudinaryError) {
           console.error('Cloudinary deletion error:', cloudinaryError);
           // Continue with database deletion even if Cloudinary fails
@@ -892,7 +893,13 @@ app.post(
       // Handle PDF file upload to Cloudinary
       if (req.file) {
         try {
-          const cloudinaryResult = await uploadToCloudinary(req.file.path);
+          // CRITICAL: PDFs must use resource_type: "raw" to preserve as PDF
+          const isPdf = req.file.mimetype === 'application/pdf';
+          const uploadOptions = isPdf 
+            ? { resource_type: 'raw', folder: 'jamalpur-chamber/pdf' }
+            : {};
+          
+          const cloudinaryResult = await uploadToCloudinary(req.file.path, uploadOptions);
           noticeData.pdfFile = {
             publicId: cloudinaryResult.public_id,
             originalName: req.file.originalname,
@@ -943,6 +950,29 @@ app.post(
   }
 );
 
+// Proxy endpoint to serve PDF files with signed URLs
+app.get("/api/files/cloudinary/:publicId(*)", async (req, res) => {
+  try {
+    const publicId = req.params.publicId;
+    const { cloudinary } = require("./middleware/cloudinaryUpload");
+    
+    // Generate a signed URL that expires in 1 hour
+    const signedUrl = cloudinary.url(publicId, {
+      resource_type: 'raw',
+      type: 'upload',
+      sign_url: true,
+      secure: true,
+      expires_at: Math.floor(Date.now() / 1000) + 3600 // 1 hour
+    });
+    
+    // Redirect to the signed URL
+    res.redirect(signedUrl);
+  } catch (error) {
+    console.error("Error generating signed URL:", error);
+    res.status(500).json({ message: "Error accessing file" });
+  }
+});
+
 app.get("/api/notices", async (req, res) => {
   try {
     const notices = await Notice.find({ isActive: true })
@@ -984,10 +1014,16 @@ app.put(
         try {
           // Delete old file from Cloudinary if it exists
           if (existingNotice.pdfFile && existingNotice.pdfFile.publicId) {
-            await deleteFromCloudinary(existingNotice.pdfFile.publicId);
+            await deleteFromCloudinary(existingNotice.pdfFile.publicId, 'raw');
           }
           
-          const cloudinaryResult = await uploadToCloudinary(req.file.path);
+          // CRITICAL: PDFs must use resource_type: "raw" to preserve as PDF
+          const isPdf = req.file.mimetype === 'application/pdf';
+          const uploadOptions = isPdf 
+            ? { resource_type: 'raw', folder: 'jamalpur-chamber/pdf' }
+            : {};
+          
+          const cloudinaryResult = await uploadToCloudinary(req.file.path, uploadOptions);
           updateData.pdfFile = {
             publicId: cloudinaryResult.public_id,
             originalName: req.file.originalname,
@@ -1050,7 +1086,7 @@ app.delete(
 
       // Delete associated PDF file from Cloudinary if it exists
       if (notice.pdfFile && notice.pdfFile.publicId) {
-        await deleteFromCloudinary(notice.pdfFile.publicId);
+        await deleteFromCloudinary(notice.pdfFile.publicId, 'raw');
       }
 
       // Delete the notice from database

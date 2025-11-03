@@ -161,10 +161,23 @@ class PDFHandler {
    * @returns {string} Display filename
    */
   getFilename(pdfFile) {
-    if (!pdfFile) return "document.pdf";
-    return (
-      pdfFile.originalName || pdfFile.name || pdfFile.filename || "document.pdf"
-    );
+    if (!pdfFile) return "document";
+    const base = (pdfFile.originalName || pdfFile.name || pdfFile.filename || "document").trim();
+    // If originalName has extension, keep it as-is
+    const hasExtension = /\.[A-Za-z0-9]{2,6}$/.test(base);
+
+    if (hasExtension) return base;
+
+    // Infer extension from mimetype
+    const mime = (pdfFile.mimetype || "").toLowerCase();
+    let ext = "";
+    if (mime.includes("pdf")) ext = ".pdf";
+    else if (mime.includes("jpeg") || mime.includes("jpg")) ext = ".jpg";
+    else if (mime.includes("png")) ext = ".png";
+    else if (mime.includes("gif")) ext = ".gif";
+    else if (mime.includes("octet-stream")) ext = ""; // unknown
+
+    return `${base}${ext}` || "document";
   }
 
   /**
@@ -185,25 +198,102 @@ class PDFHandler {
    */
   async _downloadFromUrl(pdfFile) {
     const filename = this.getFilename(pdfFile);
+    const expectPdf = /\.pdf$/i.test(filename) || (pdfFile.mimetype || "").toLowerCase().includes("pdf");
     
     try {
-      // Try fetch method first (more reliable for large files)
-      const response = await fetch(pdfFile.url);
+      console.log("📥 Fetching PDF from Cloudinary URL:", pdfFile.url);
       
-      if (response.ok) {
-        const blob = await response.blob();
-        this._downloadBlob(blob, filename);
-        return true;
-      } else {
-        // Fallback to direct link method
-        this._downloadDirect(pdfFile.url, filename);
-        return true;
+      // CRITICAL: Convert Cloudinary image URL to raw URL if needed
+      // PDFs uploaded with resource_type: "raw" must use /raw/upload/ path
+      let fetchUrl = pdfFile.url;
+      if (fetchUrl.includes('res.cloudinary.com')) {
+        // If URL uses /image/upload/, convert to /raw/upload/ for PDFs
+        if (fetchUrl.includes('/image/upload/')) {
+          fetchUrl = fetchUrl.replace('/image/upload/', '/raw/upload/');
+          console.log("🔧 Converted image URL to raw URL:", fetchUrl);
+        }
+        
+        // If we have publicId, construct proper raw URL
+        if (pdfFile.publicId && !fetchUrl.includes('/raw/upload/')) {
+          const cloudName = fetchUrl.match(/res\.cloudinary\.com\/([^/]+)/)?.[1];
+          if (cloudName) {
+            // Remove any file extension from publicId
+            const cleanPublicId = pdfFile.publicId.replace(/\.(pdf|jpg|jpeg|png|gif)$/i, '');
+            fetchUrl = `https://res.cloudinary.com/${cloudName}/raw/upload/${cleanPublicId}`;
+            console.log("🔧 Using publicId to construct raw URL:", fetchUrl);
+          }
+        }
+        
+        // Add attachment flag for download
+        const separator = fetchUrl.includes('?') ? '&' : '?';
+        if (!fetchUrl.includes('fl_attachment')) {
+          fetchUrl = `${fetchUrl}${separator}fl_attachment`;
+        }
       }
-    } catch (error) {
-      console.error("Fetch download failed, using direct method:", error);
-      // Fallback to direct link method
-      this._downloadDirect(pdfFile.url, filename);
+      
+      // Always use fetch + blob method for Cloudinary URLs
+      // Direct link won't work due to CORS - browsers ignore download attribute
+      const response = await fetch(fetchUrl, {
+        method: 'GET',
+        mode: 'cors',
+        cache: 'no-cache',
+        credentials: 'omit',
+        headers: {
+          'Accept': 'application/pdf, application/octet-stream, */*'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      // Get the content type from response headers
+      const contentType = response.headers.get('content-type') || 'application/pdf';
+      console.log("📄 Content-Type:", contentType);
+      
+      // Get the blob data directly (more reliable than arrayBuffer)
+      const blob = await response.blob();
+      
+      if (!blob || blob.size === 0) {
+        throw new Error("Downloaded file is empty");
+      }
+      
+      console.log("✅ PDF blob received, size:", blob.size, "bytes", "type:", blob.type);
+      
+      let finalBlob = blob;
+      if (expectPdf) {
+        // Validate PDF by checking magic bytes (PDF files start with %PDF)
+        const firstChunk = blob.slice(0, 4);
+        const firstBytesArray = await firstChunk.arrayBuffer();
+        const firstBytes = String.fromCharCode(...new Uint8Array(firstBytesArray));
+        if (!firstBytes.startsWith('%PDF')) {
+          console.warn("⚠️ Warning: File may not be a valid PDF. First bytes:", firstBytes);
+        } else {
+          console.log("✅ PDF header validated:", firstBytes);
+        }
+        // Normalize MIME if needed, but only for PDFs
+        if (!(blob.type === 'application/pdf' || blob.type === 'application/octet-stream' || !blob.type)) {
+          finalBlob = new Blob([await blob.arrayBuffer()], { type: 'application/pdf' });
+        }
+        console.log("✅ Blob finalized (PDF), size:", finalBlob.size, "bytes");
+      }
+      // Download using blob URL (this always triggers download, not view)
+      this._downloadBlob(finalBlob, filename);
       return true;
+      
+    } catch (error) {
+      console.error("❌ PDF download from Cloudinary failed:", error);
+      console.error("Error details:", {
+        message: error.message,
+        url: pdfFile.url,
+        filename: filename,
+        stack: error.stack
+      });
+      
+      // Show user-friendly error
+      alert(`PDF download failed: ${error.message}\n\nPlease try again or contact support if the problem persists.`);
+      
+      return false;
     }
   }
 
@@ -216,25 +306,66 @@ class PDFHandler {
       process.env.REACT_APP_API_URL || "https://jamalpur-chamber-backend-b61d.onrender.com/api"
     }/files/${pdfFile.filename || pdfFile.fileId}`;
     const filename = this.getFilename(pdfFile);
+    const expectPdf = /\.pdf$/i.test(filename) || (pdfFile.mimetype || "").toLowerCase().includes("pdf");
 
     try {
-      // Try fetch method first (more reliable for large files)
-      const response = await fetch(pdfUrl);
+      console.log("📥 Fetching PDF from server:", pdfUrl);
+      
+      // Use fetch method for reliable downloads
+      const response = await fetch(pdfUrl, {
+        method: 'GET',
+        cache: 'no-cache',
+        credentials: 'omit'
+      });
 
-      if (response.ok) {
-        const blob = await response.blob();
-        this._downloadBlob(blob, filename);
-        return true;
-      } else {
-        // Fallback to direct link method
-        this._downloadDirect(pdfUrl, filename);
-        return true;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    } catch (error) {
-      console.error("Fetch download failed, using direct method:", error);
-      // Fallback to direct link method
-      this._downloadDirect(pdfUrl, filename);
+
+      // Get content type from response
+      const contentType = response.headers.get('content-type') || 'application/pdf';
+      console.log("📄 Content-Type:", contentType);
+      
+      // Get the blob data directly (more reliable)
+      const blob = await response.blob();
+      
+      if (!blob || blob.size === 0) {
+        throw new Error("Downloaded file is empty");
+      }
+      
+      console.log("✅ PDF blob received from server, size:", blob.size, "bytes", "type:", blob.type);
+      
+      let finalBlob = blob;
+      if (expectPdf) {
+        // Validate PDF by checking magic bytes
+        const firstChunk = blob.slice(0, 4);
+        const firstBytesArray = await firstChunk.arrayBuffer();
+        const firstBytes = String.fromCharCode(...new Uint8Array(firstBytesArray));
+        if (!firstBytes.startsWith('%PDF')) {
+          console.warn("⚠️ Warning: File may not be a valid PDF. First bytes:", firstBytes);
+        } else {
+          console.log("✅ PDF header validated:", firstBytes);
+        }
+        if (!(blob.type === 'application/pdf' || blob.type === 'application/octet-stream' || !blob.type)) {
+          finalBlob = new Blob([await blob.arrayBuffer()], { type: 'application/pdf' });
+        }
+      }
+      this._downloadBlob(finalBlob, filename);
       return true;
+      
+    } catch (error) {
+      console.error("❌ Server PDF download failed:", error);
+      console.error("Error details:", {
+        message: error.message,
+        url: pdfUrl,
+        filename: filename,
+        stack: error.stack
+      });
+      
+      // Show user-friendly error
+      alert(`PDF download failed: ${error.message}\n\nPlease try again or contact support if the problem persists.`);
+      
+      return false;
     }
   }
 
@@ -243,13 +374,30 @@ class PDFHandler {
    * @private
    */
   _downloadFromDataURL(pdfFile) {
-    const link = document.createElement("a");
-    link.href = pdfFile.data;
-    link.download = this.getFilename(pdfFile);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    return true;
+    try {
+      const filename = this.getFilename(pdfFile);
+      // Sanitize filename
+      const sanitizedFilename = filename.replace(/[<>:"/\\|?*]/g, '_').trim() || 'document.pdf';
+      const finalFilename = /\.pdf$/i.test(sanitizedFilename)
+        ? sanitizedFilename 
+        : `${sanitizedFilename}.pdf`;
+      
+      const link = document.createElement("a");
+      link.href = pdfFile.data;
+      link.download = finalFilename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      
+      setTimeout(() => {
+        document.body.removeChild(link);
+      }, 100);
+      
+      return true;
+    } catch (error) {
+      console.error("❌ Error downloading from data URL:", error);
+      return false;
+    }
   }
 
   /**
@@ -257,30 +405,113 @@ class PDFHandler {
    * @private
    */
   _downloadBlob(blob, filename) {
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    // Clean up URL object
-    setTimeout(() => window.URL.revokeObjectURL(url), 100);
+    try {
+      // Sanitize filename - remove any invalid characters
+      const sanitizedFilename = filename.replace(/[<>:"/\\|?*]/g, '_').trim() || 'document';
+      
+      // If no extension, try inferring from blob type
+      const hasExtension = /\.[A-Za-z0-9]{2,6}$/.test(sanitizedFilename);
+      let finalFilename = sanitizedFilename;
+      if (!hasExtension) {
+        const type = (blob && blob.type ? blob.type : '').toLowerCase();
+        if (type.includes('pdf')) finalFilename += '.pdf';
+        else if (type.includes('jpeg') || type.includes('jpg')) finalFilename += '.jpg';
+        else if (type.includes('png')) finalFilename += '.png';
+        else if (type.includes('gif')) finalFilename += '.gif';
+      }
+      
+      console.log("💾 Downloading blob as:", finalFilename, "Size:", blob.size, "bytes", "Type:", blob.type);
+      
+      // Validate blob before download
+      if (!blob || blob.size === 0) {
+        throw new Error("Invalid blob: file is empty");
+      }
+      
+      // If it looks like a PDF, validate header for debugging
+      if (/\.pdf$/i.test(finalFilename)) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const arrayBuffer = reader.result;
+          const uint8Array = new Uint8Array(arrayBuffer);
+          const header = String.fromCharCode(...uint8Array.slice(0, 4));
+          if (!header.startsWith('%PDF')) {
+            console.warn("⚠️ Warning: Downloaded file may not be a valid PDF. Header:", header);
+          } else {
+            console.log("✅ PDF header validated:", header);
+          }
+        };
+        const firstChunk = blob.slice(0, 4);
+        reader.readAsArrayBuffer(firstChunk);
+      }
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = finalFilename;
+      link.style.display = 'none'; // Hide the link
+      
+      // Set download attribute with proper filename
+      link.setAttribute('download', finalFilename);
+      
+      // Append to body, click, then remove
+      document.body.appendChild(link);
+      
+      // Trigger download
+      link.click();
+      
+      console.log("✅ Download triggered for:", finalFilename);
+      
+      // Clean up after download starts
+      setTimeout(() => {
+        try {
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          console.log("✅ Download link cleaned up");
+        } catch (cleanupError) {
+          console.warn("⚠️ Cleanup warning:", cleanupError);
+        }
+      }, 1000); // Increased timeout to ensure download starts
+      
+    } catch (error) {
+      console.error("❌ Error downloading blob:", error);
+      alert(`Failed to download PDF: ${error.message}`);
+      throw error;
+    }
   }
 
   /**
-   * Direct download using link
+   * Direct download using link (fallback for same-origin URLs only)
+   * Note: For cross-origin URLs, download attribute is ignored by browsers
    * @private
    */
   _downloadDirect(url, filename) {
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.target = "_blank";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      // Sanitize filename
+      const sanitizedFilename = filename.replace(/[<>:"/\\|?*]/g, '_').trim() || 'document.pdf';
+      // Ensure filename has .pdf extension (case-insensitive check)
+      const finalFilename = /\.pdf$/i.test(sanitizedFilename)
+        ? sanitizedFilename 
+        : `${sanitizedFilename}.pdf`;
+      
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = finalFilename;
+      // Don't use target="_blank" as it can prevent download
+      link.style.display = 'none';
+      
+      document.body.appendChild(link);
+      link.click();
+      
+      // Delay removal to allow download to start
+      setTimeout(() => {
+        document.body.removeChild(link);
+      }, 200);
+      
+    } catch (error) {
+      console.error("❌ Error in direct download:", error);
+      // Fallback: open in new tab
+      window.open(url, '_blank');
+    }
   }
 }
 
