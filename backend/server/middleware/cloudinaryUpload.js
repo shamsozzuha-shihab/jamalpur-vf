@@ -52,59 +52,13 @@ const upload = multer({
 // Helper function to upload file to Cloudinary
 const uploadToCloudinary = async (filePath, options = {}) => {
   try {
-    // Build base configuration
-    const baseConfig = {
+    const result = await cloudinary.uploader.upload(filePath, {
       folder: "jamalpur-chamber",
       resource_type: "auto",
-      type: "upload", // Ensure it's a standard upload
-      access_mode: "public", // CRITICAL: Make files publicly accessible
+      quality: "auto",
+      fetch_format: "auto",
       ...options
-    };
-    
-    // Only add image-specific options if resource_type is NOT 'raw' (for PDFs)
-    if (baseConfig.resource_type !== 'raw') {
-      baseConfig.quality = "auto";
-      baseConfig.fetch_format = "auto";
-    }
-    
-    // Log upload configuration for debugging
-    console.log('📤 Uploading to Cloudinary:', {
-      resource_type: baseConfig.resource_type,
-      folder: baseConfig.folder,
-      hasQuality: !!baseConfig.quality,
-      hasFetchFormat: !!baseConfig.fetch_format,
-      filePath: filePath
     });
-    
-    const result = await cloudinary.uploader.upload(filePath, baseConfig);
-    
-    // Log upload result
-    console.log('✅ Cloudinary upload result:', {
-      resource_type: result.resource_type,
-      format: result.format,
-      secure_url: result.secure_url,
-      public_id: result.public_id,
-      bytes: result.bytes
-    });
-    
-    // Verify PDFs are uploaded as raw
-    if (options.resource_type === 'raw' && result.resource_type !== 'raw') {
-      console.error('⚠️ WARNING: PDF uploaded but resource_type is not raw!', {
-        expected: 'raw',
-        actual: result.resource_type,
-        url: result.secure_url
-      });
-    }
-    
-    // CRITICAL FIX: Ensure PDFs use raw URL format
-    // Cloudinary sometimes returns image URLs even for raw uploads
-    if (options.resource_type === 'raw' || result.resource_type === 'raw') {
-      // Ensure the URL uses /raw/upload/ path instead of /image/upload/
-      if (result.secure_url && result.secure_url.includes('/image/upload/')) {
-        result.secure_url = result.secure_url.replace('/image/upload/', '/raw/upload/');
-        console.log('🔧 Fixed URL to use raw format:', result.secure_url);
-      }
-    }
     
     // Clean up temporary file
     fs.unlinkSync(filePath);
@@ -120,11 +74,11 @@ const uploadToCloudinary = async (filePath, options = {}) => {
 };
 
 // Helper function to delete file from Cloudinary
-const deleteFromCloudinary = async (publicId, resourceType = 'image') => {
+const deleteFromCloudinary = async (publicId) => {
   try {
     if (publicId) {
-      await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
-      console.log(`✅ Deleted file from Cloudinary: ${publicId} (resource_type: ${resourceType})`);
+      await cloudinary.uploader.destroy(publicId);
+      console.log(`✅ Deleted file from Cloudinary: ${publicId}`);
     }
   } catch (error) {
     console.error(`❌ Error deleting file from Cloudinary: ${error.message}`);
@@ -135,18 +89,12 @@ const deleteFromCloudinary = async (publicId, resourceType = 'image') => {
 const getFileUrl = (publicId, resourceType = "auto") => {
   if (!publicId) return null;
   
-  const config = {
+  return cloudinary.url(publicId, {
     resource_type: resourceType,
-    secure: true
-  };
-  
-  // Only add image-specific options if resource_type is NOT 'raw'
-  if (resourceType !== 'raw') {
-    config.quality = "auto";
-    config.fetch_format = "auto";
-  }
-  
-  return cloudinary.url(publicId, config);
+    secure: true,
+    quality: "auto",
+    fetch_format: "auto"
+  });
 };
 
 module.exports = {
