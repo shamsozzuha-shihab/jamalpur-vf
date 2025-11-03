@@ -161,10 +161,23 @@ class PDFHandler {
    * @returns {string} Display filename
    */
   getFilename(pdfFile) {
-    if (!pdfFile) return "document.pdf";
-    return (
-      pdfFile.originalName || pdfFile.name || pdfFile.filename || "document.pdf"
-    );
+    if (!pdfFile) return "document";
+    const base = (pdfFile.originalName || pdfFile.name || pdfFile.filename || "document").trim();
+    // If originalName has extension, keep it as-is
+    const hasExtension = /\.[A-Za-z0-9]{2,6}$/.test(base);
+
+    if (hasExtension) return base;
+
+    // Infer extension from mimetype
+    const mime = (pdfFile.mimetype || "").toLowerCase();
+    let ext = "";
+    if (mime.includes("pdf")) ext = ".pdf";
+    else if (mime.includes("jpeg") || mime.includes("jpg")) ext = ".jpg";
+    else if (mime.includes("png")) ext = ".png";
+    else if (mime.includes("gif")) ext = ".gif";
+    else if (mime.includes("octet-stream")) ext = ""; // unknown
+
+    return `${base}${ext}` || "document";
   }
 
   /**

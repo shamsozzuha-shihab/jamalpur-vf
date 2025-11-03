@@ -52,13 +52,22 @@ const upload = multer({
 // Helper function to upload file to Cloudinary
 const uploadToCloudinary = async (filePath, options = {}) => {
   try {
-    const result = await cloudinary.uploader.upload(filePath, {
+    // Build base configuration with PUBLIC access mode
+    const baseConfig = {
       folder: "jamalpur-chamber",
       resource_type: "auto",
-      quality: "auto",
-      fetch_format: "auto",
+      type: "upload",
+      access_mode: "public", // CRITICAL: Make files publicly accessible to fix 401 errors
       ...options
-    });
+    };
+    
+    // Only add image-specific options if resource_type is NOT 'raw' (for PDFs)
+    if (baseConfig.resource_type !== 'raw') {
+      baseConfig.quality = "auto";
+      baseConfig.fetch_format = "auto";
+    }
+    
+    const result = await cloudinary.uploader.upload(filePath, baseConfig);
     
     // Clean up temporary file
     fs.unlinkSync(filePath);
